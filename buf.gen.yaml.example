@@ -1,0 +1,43 @@
+---
+version: v2
+clean: true
+managed:
+  enabled: true
+  override:
+    - file_option: go_package_prefix
+      path: api/core
+      value: github.com/your_username/your-new-project/pkg
+  disable:
+    - module: buf.build/envoyproxy/protoc-gen-validate
+    - module: buf.build/grpc-ecosystem/grpc-gateway
+    - module: buf.build/googleapis/googleapis
+    - module: buf.build/community/google-gnostic-openapi
+plugins:
+  - remote: buf.build/protocolbuffers/go
+    out: pkg/
+    opt:
+      - paths=source_relative
+
+  - remote: buf.build/grpc/go
+    out: pkg/
+    opt:
+      - paths=source_relative
+      - require_unimplemented_servers=false
+
+  - remote: buf.build/grpc-ecosystem/gateway
+    out: pkg/
+    opt:
+      - paths=source_relative
+      - generate_unbound_methods=true
+
+  - remote: buf.build/community/google-gnostic-openapi
+    out: pkg/api/core/v1/
+    opt:
+      - paths=source_relative
+      - default_response=false
+      - fq_schema_naming=true
+inputs:
+  - directory: .
+    exclude_paths:
+      - .trunk/
+      - .git/

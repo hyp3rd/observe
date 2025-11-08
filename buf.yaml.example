@@ -1,0 +1,19 @@
+---
+# For details on buf.yaml configuration, visit https://buf.build/docs/configuration/v2/buf-yaml
+version: v2
+name: buf.build//github.com/your_username
+deps:
+  - buf.build/envoyproxy/protoc-gen-validate
+  - buf.build/googleapis/googleapis
+  - buf.build/gnostic/gnostic
+lint:
+  use:
+    - STANDARD
+    - PACKAGE_VERSION_SUFFIX
+    - ENUM_ZERO_VALUE_SUFFIX
+    - SERVICE_SUFFIX
+  ignore:
+    - .trunk
+breaking:
+  use:
+    - FILE
