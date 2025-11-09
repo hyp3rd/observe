@@ -7,6 +7,7 @@ import (
 	"errors"
 	"os"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/hyp3rd/ewrap"
@@ -33,6 +34,31 @@ type exporterBundle struct {
 	traceExporter  sdktrace.SpanExporter
 	metricExporter sdkmetric.Exporter
 	metricReader   *sdkmetric.PeriodicReader
+	traceStats     *traceExporterStats
+}
+
+type traceExporterStats struct {
+	queueLimit int64
+	dropped    atomic.Int64
+}
+
+func newTraceExporterStats(batchCfg config.BatchConfig) *traceExporterStats {
+	limit := int64(batchCfg.MaxQueueSize)
+	if limit <= 0 {
+		limit = 2048
+	}
+
+	return &traceExporterStats{
+		queueLimit: limit,
+	}
+}
+
+func (s *traceExporterStats) recordDrop(n int64) {
+	if s == nil || n <= 0 {
+		return
+	}
+
+	s.dropped.Add(n)
 }
 
 func newExporterBundle(ctx context.Context, cfg config.ExporterConfig) (*exporterBundle, error) {
@@ -49,6 +75,12 @@ func newExporterBundle(ctx context.Context, cfg config.ExporterConfig) (*exporte
 		return nil, err
 	}
 
+	traceStats := newTraceExporterStats(cfg.OTLP.Batch)
+	traceExp = &spanExporterWithStats{
+		inner: traceExp,
+		stats: traceStats,
+	}
+
 	metricExp, err := newOTLPMetricExporter(ctx, cfg.OTLP)
 	if err != nil {
 		return nil, err
@@ -63,6 +95,7 @@ func newExporterBundle(ctx context.Context, cfg config.ExporterConfig) (*exporte
 		traceExporter:  traceExp,
 		metricExporter: metricExp,
 		metricReader:   reader,
+		traceStats:     traceStats,
 	}, nil
 }
 
@@ -336,6 +369,37 @@ func metricHTTPCompression(value string) otlpmetrichttp.Compression {
 	}
 
 	return otlpmetrichttp.NoCompression
+}
+
+type spanExporterWithStats struct {
+	inner sdktrace.SpanExporter
+	stats *traceExporterStats
+}
+
+func (s *spanExporterWithStats) ExportSpans(ctx context.Context, spans []sdktrace.ReadOnlySpan) error {
+	if s == nil || s.inner == nil {
+		return nil
+	}
+
+	err := s.inner.ExportSpans(ctx, spans)
+	if err != nil {
+		s.stats.recordDrop(int64(len(spans)))
+	}
+
+	return ewrap.Wrap(err, "export spans")
+}
+
+func (s *spanExporterWithStats) Shutdown(ctx context.Context) error {
+	if s == nil || s.inner == nil {
+		return nil
+	}
+
+	err := s.inner.Shutdown(ctx)
+	if err != nil {
+		return ewrap.Wrap(err, "shutdown span exporter")
+	}
+
+	return nil
 }
 
 // tlsConfigFrom builds a tls.Config from the provided TLSConfig.

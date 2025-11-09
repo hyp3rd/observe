@@ -18,11 +18,12 @@ import (
 
 // Client provides access to the active runtime and useful helpers.
 type Client struct {
-	mu          sync.RWMutex
-	runtime     *runtime.Runtime
-	opts        options
-	logger      logging.Adapter
-	watchCancel context.CancelFunc
+	mu           sync.RWMutex
+	runtime      *runtime.Runtime
+	opts         options
+	logger       logging.Adapter
+	metricsState *runtime.MetricsState
+	watchCancel  context.CancelFunc
 }
 
 // Init bootstraps the instrumentation runtime from configuration sources.
@@ -49,15 +50,23 @@ func Init(ctx context.Context, opts ...Option) (*Client, error) {
 
 	settings.logger = logger
 
+	metricsState := runtime.NewMetricsState()
+
 	rt, err := runtime.New(ctx, cfg)
 	if err != nil {
 		return nil, ewrap.Wrap(err, "init runtime")
 	}
 
+	err = rt.InitMetrics(metricsState)
+	if err != nil {
+		return nil, ewrap.Wrap(err, "init runtime metrics")
+	}
+
 	client := &Client{
-		runtime: rt,
-		opts:    settings,
-		logger:  logger,
+		runtime:      rt,
+		opts:         settings,
+		logger:       logger,
+		metricsState: metricsState,
 	}
 
 	err = client.startConfigWatcher(ctx)
@@ -192,7 +201,15 @@ func (c *Client) reloadRuntime(ctx context.Context) {
 		return
 	}
 
+	err = rt.InitMetrics(c.metricsState)
+	if err != nil {
+		c.logger.Error(ctx, err, "runtime metrics init failed")
+
+		return
+	}
+
 	c.swapRuntime(ctx, rt)
+	c.metricsState.IncrementConfigReloads()
 	c.logger.Info(ctx, "runtime reloaded")
 }
 

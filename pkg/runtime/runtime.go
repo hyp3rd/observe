@@ -35,6 +35,7 @@ type Runtime struct {
 	httpMiddleware *observehttp.Middleware
 	grpcServerInt  grpc.UnaryServerInterceptor
 	grpcClientInt  grpc.UnaryClientInterceptor
+	metrics        *runtimeMetricsController
 	sqlHelper      *observesql.Helper
 	diagServer     *diagnostics.Server
 	startTime      time.Time
@@ -151,6 +152,26 @@ func (r *Runtime) SQLHelper() *observesql.Helper {
 	return r.sqlHelper
 }
 
+// InitMetrics wires runtime-level metrics if enabled in configuration.
+func (r *Runtime) InitMetrics(state *MetricsState) error {
+	if !r.cfg.Instrumentation.RuntimeMetrics.Enabled {
+		return nil
+	}
+
+	controller := &runtimeMetricsController{
+		state: state,
+	}
+
+	err := controller.start(r, r.meterProvider)
+	if err != nil {
+		return err
+	}
+
+	r.metrics = controller
+
+	return nil
+}
+
 // Shutdown releases resources and flushes telemetry.
 //
 //nolint:revive // cognitive-complexity: this is acceptable for a shutdown function. Breaking it up would reduce clarity.
@@ -176,6 +197,13 @@ func (r *Runtime) Shutdown(ctx context.Context) error {
 
 		if r.exporters != nil {
 			err := r.exporters.shutdown(ctx)
+			if err != nil {
+				errs = append(errs, err)
+			}
+		}
+
+		if r.metrics != nil {
+			err := r.metrics.shutdown()
 			if err != nil {
 				errs = append(errs, err)
 			}
