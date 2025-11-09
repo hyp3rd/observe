@@ -184,6 +184,7 @@ func TestSnapshotBasic(t *testing.T) {
 	assertSnapshotDefaults(t, snap)
 }
 
+//nolint:revive // length is acceptable for test function (max 75 but got 79)
 func TestSnapshotExporterStatus(t *testing.T) {
 	t.Parallel()
 
@@ -193,11 +194,23 @@ func TestSnapshotExporterStatus(t *testing.T) {
 		endpoint:   "collector:4317",
 	}
 	traceStats.dropped.Store(droppedSpans)
+	traceStats.errorCount.Add(2)
+
+	lastTraceSuccess := time.Unix(1720000000, 0).UTC()
+	traceStats.lastSuccess.Store(&lastTraceSuccess)
+	traceStats.lastError.Store(&exporterError{
+		message: "trace boom",
+		time:    time.Unix(1720001000, 0).UTC(),
+	})
 
 	metricStats := &metricExporterStats{
 		protocol: "http",
 		endpoint: collectorEndpoint,
 	}
+	metricStats.errorCount.Add(1)
+
+	lastMetricSuccess := time.Unix(1720002000, 0).UTC()
+	metricStats.lastSuccess.Store(&lastMetricSuccess)
 
 	rt := &Runtime{
 		cfg: config.Config{
@@ -225,12 +238,32 @@ func TestSnapshotExporterStatus(t *testing.T) {
 		t.Fatalf("expected trace exporter endpoint collector:4317, got %s", snap.TraceExporter.Endpoint)
 	}
 
+	if snap.TraceExporter.ErrorCount != 2 {
+		t.Fatalf("expected trace exporter error count 2, got %d", snap.TraceExporter.ErrorCount)
+	}
+
+	if snap.TraceExporter.LastSuccessTime != lastTraceSuccess {
+		t.Fatalf("expected trace exporter last success %v, got %v", lastTraceSuccess, snap.TraceExporter.LastSuccessTime)
+	}
+
+	if snap.TraceExporter.LastError != "trace boom" {
+		t.Fatalf("expected trace exporter last error trace boom, got %s", snap.TraceExporter.LastError)
+	}
+
 	if snap.MetricExporter.Endpoint != collectorEndpoint {
 		t.Fatalf("expected metric exporter endpoint collector:4318, got %s", snap.MetricExporter.Endpoint)
 	}
 
 	if snap.MetricExporter.Protocol != "http" {
 		t.Fatalf("expected metric protocol http, got %s", snap.MetricExporter.Protocol)
+	}
+
+	if snap.MetricExporter.ErrorCount != 1 {
+		t.Fatalf("expected metric exporter error count 1, got %d", snap.MetricExporter.ErrorCount)
+	}
+
+	if snap.MetricExporter.LastSuccessTime != lastMetricSuccess {
+		t.Fatalf("expected metric exporter last success %v, got %v", lastMetricSuccess, snap.MetricExporter.LastSuccessTime)
 	}
 }
 

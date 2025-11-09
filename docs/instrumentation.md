@@ -43,6 +43,7 @@ Observe ships a set of instrumentation helpers under `pkg/instrumentation`. Each
       - `Helper.Instrument` wraps background jobs.
       - Emits spans + `worker.job.count`/`worker.job.duration_ms` metrics with success/error tagging.
       - Concrete adapter `pkg/instrumentation/worker/ticker` runs cron/ticker style jobs with graceful stop + error hooks.
+      - `pkg/instrumentation/worker/kafka` consumes `segmentio/kafka-go` readers, layering worker + messaging helpers with auto commits.
 
 ## Diagnostics & Runtime Metrics
 
@@ -50,6 +51,7 @@ Observe ships a set of instrumentation helpers under `pkg/instrumentation`. Each
       - Service metadata, instrumentation toggles, config reload count.
       - Trace exporter protocol/endpoint + last error, queue limit, dropped spans.
       - Metric exporter protocol/endpoint + last error (mirrors trace fields for parity).
+      - Exporter success/error timestamps and cumulative error counters for both signals.
 - Runtime metrics (enable via `instrumentation.runtime_metrics.enabled`):
       - Go runtime metrics via `go.opentelemetry.io/contrib/instrumentation/runtime`.
       - Observe-specific gauges for instrumentation enablement and exporter queue size.

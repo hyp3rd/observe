@@ -37,10 +37,12 @@ type Snapshot struct {
 
 // ExporterStatus describes exporter health for diagnostics.
 type ExporterStatus struct {
-	Protocol      string    `json:"protocol"`
-	Endpoint      string    `json:"endpoint"`
-	LastError     string    `json:"last_error"`
-	LastErrorTime time.Time `json:"last_error_time"`
+	Protocol        string    `json:"protocol"`
+	Endpoint        string    `json:"endpoint"`
+	LastError       string    `json:"last_error"`
+	LastErrorTime   time.Time `json:"last_error_time"`
+	LastSuccessTime time.Time `json:"last_success_time"`
+	ErrorCount      int64     `json:"error_count"`
 }
 
 // SnapshotProvider supplies diagnostic snapshots.

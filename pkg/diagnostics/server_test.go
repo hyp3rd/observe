@@ -22,6 +22,7 @@ func (s stubSnapshotProvider) Snapshot() diagnostics.Snapshot {
 	return s.snapshot
 }
 
+//nolint:revive // length is acceptable for test function (max 75 but got 77)
 func TestHandleStatusReturnsSnapshot(t *testing.T) {
 	t.Parallel()
 
@@ -30,14 +31,17 @@ func TestHandleStatusReturnsSnapshot(t *testing.T) {
 		snapshot: diagnostics.Snapshot{
 			ServiceName: "test",
 			TraceExporter: diagnostics.ExporterStatus{
-				Protocol:      "grpc",
-				Endpoint:      "collector:4317",
-				LastError:     "boom",
-				LastErrorTime: time.Date(2024, 12, 5, 12, 0, 0, 0, time.UTC),
+				Protocol:        "grpc",
+				Endpoint:        "collector:4317",
+				LastError:       "boom",
+				LastErrorTime:   time.Date(2024, 12, 5, 12, 0, 0, 0, time.UTC),
+				LastSuccessTime: time.Date(2024, 12, 5, 11, 59, 0, 0, time.UTC),
+				ErrorCount:      3,
 			},
 			MetricExporter: diagnostics.ExporterStatus{
-				Protocol: "http",
-				Endpoint: "collector:4318",
+				Protocol:        "http",
+				Endpoint:        "collector:4318",
+				LastSuccessTime: time.Date(2024, 12, 5, 11, 58, 0, 0, time.UTC),
 			},
 		},
 	}
@@ -82,8 +86,20 @@ func TestHandleStatusReturnsSnapshot(t *testing.T) {
 		t.Fatalf("expected last error boom, got %s", snapshot.TraceExporter.LastError)
 	}
 
+	if snapshot.TraceExporter.LastSuccessTime.IsZero() {
+		t.Fatal("expected trace exporter last success to be set")
+	}
+
+	if snapshot.TraceExporter.ErrorCount != 3 {
+		t.Fatalf("expected trace exporter error count 3, got %d", snapshot.TraceExporter.ErrorCount)
+	}
+
 	if snapshot.MetricExporter.Endpoint != "collector:4318" {
 		t.Fatalf("expected metric endpoint collector:4318, got %s", snapshot.MetricExporter.Endpoint)
+	}
+
+	if snapshot.MetricExporter.LastSuccessTime.IsZero() {
+		t.Fatal("expected metric exporter last success to be set")
 	}
 }
 

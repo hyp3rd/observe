@@ -40,12 +40,44 @@ func TestMetricExporterWithStatsRecordsErrors(t *testing.T) {
 		t.Fatal("expected stats to capture export error")
 	}
 
+	if count := stats.errorCount.Load(); count != 1 {
+		t.Fatalf("expected error count 1, got %d", count)
+	}
+
 	if wrapper.ForceFlush(context.Background()) == nil {
 		t.Fatal("expected force flush error")
 	}
 
 	if wrapper.Shutdown(context.Background()) == nil {
 		t.Fatal("expected shutdown error")
+	}
+}
+
+func TestMetricExporterWithStatsRecordsSuccess(t *testing.T) {
+	t.Parallel()
+
+	stats := &metricExporterStats{
+		protocol: "grpc",
+		endpoint: "collector:4317",
+	}
+
+	wrapper := &metricExporterWithStats{
+		inner: &stubMetricExporter{},
+		stats: stats,
+	}
+
+	err := wrapper.Export(context.Background(), &metricdata.ResourceMetrics{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	snapshot := stats.statusSnapshot()
+	if snapshot.LastSuccessTime.IsZero() {
+		t.Fatal("expected last success time to be recorded")
+	}
+
+	if snapshot.ErrorCount != 0 {
+		t.Fatalf("expected error count 0, got %d", snapshot.ErrorCount)
 	}
 }
 

@@ -110,7 +110,7 @@ Defaults <- YAML <- Remote <- Env <- Code overrides
 
 - Helper instrumentation wraps cron/job runners, emitting spans and counters with success/error tagging.
 - Worker helpers are exposed through `Runtime.WorkerHelper()` when `instrumentation.worker.enabled` is set.
-- Concrete adapters live alongside the helper (e.g., `pkg/instrumentation/worker/ticker` for cron/ticker integrations) to demonstrate production-ready usage.
+- Concrete adapters live alongside the helper (e.g., `pkg/instrumentation/worker/ticker` for cron/ticker integrations and `pkg/instrumentation/worker/kafka` for stream processing) to demonstrate production-ready usage.
 
 Instrumentation packs share a base module that fetches tracer/meter handles lazily and registers health metrics.
 
@@ -129,7 +129,7 @@ Instrumentation packs share a base module that fetches tracer/meter handles lazi
 
 ## 10. Diagnostics & Self Telemetry
 
-- `/observe/status` returns exporter health (protocol, endpoint, last error timestamp) for both trace and metric exporters, sampler mode, queue limit, dropped spans, instrumentation toggles, and config reload count. Optional auth via token/header (`diagnostics.auth_token`).
+- `/observe/status` returns exporter health (protocol, endpoint, last success/error timestamps, cumulative error counts) for both trace and metric exporters, sampler mode, queue limit, dropped spans, instrumentation toggles, and config reload count. Optional auth via token/header (`diagnostics.auth_token`).
 - `runtime_metrics` instrument records queue size, dropped spans, config reload counts, instrumentation enablement status.
 - Panic/failure hooks emit structured events and escalate via logging adapters.
 

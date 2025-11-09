@@ -50,12 +50,13 @@ Core scenarios:
          - gRPC interceptors (client/server) with payload size/latency metrics.
          - SQL/database driver instrumentation using `database/sql` hooks.
          - Message queue/event instrumentation (NATS, Kafka, Pub/Sub) via wrappers.
+         - Worker adapters for cron/ticker loops and Kafka consumers so background workloads reuse common helpers.
 1. **Context Propagation**: W3C TraceContext and Baggage by default; allow fallback to B3 for legacy consumers.
 1. **Resource Detection**: Detect environment (k8s, ECS, Lambda, bare metal) and merge with custom resource attributes supplied by integrators.
 1. **Sampling Policies**: Support always-on, always-off, parent-based, and tail-based sampling (pluggable). Provide deterministic per-tenant rate limiting to prevent noisy neighbors.
 1. **Metrics Package**: Common instruments (counters, histograms, gauges) plus helper functions for request/response latency, error counts, queue depth, goroutine/memory stats.
 1. **Logging Integration**: Structured logging helpers that correlate logs with trace/span IDs. Provide adapters for `zap`, `zerolog`, and Go stdlib log/slog.
-1. **Diagnostics**: Self-telemetry (health metrics) and debug endpoints (e.g., `/observe/status`) gated behind config for field troubleshooting.
+1. **Diagnostics**: Self-telemetry (health metrics) and debug endpoints (e.g., `/observe/status`) gated behind config for field troubleshooting. Exporter health must include protocol, endpoint, queue stats, last success/error timestamps, and cumulative error counters for each signal.
 1. **Extensibility**: Public interfaces for instrumentation hooks, attribute mutators, and exporters; documentation covering how to implement each.
 
 ## 6. Non-Functional Requirements
@@ -148,7 +149,7 @@ Core scenarios:
 
 ---
 
-***Next Steps***
+## Next Steps
 
 - Validate requirements with platform/SRE stakeholders.
 - Prototype the bootstrap API and HTTP middleware to de-risk performance targets.

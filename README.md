@@ -306,9 +306,28 @@ defer adapter.Stop(context.Background())
 
 Import path: `github.com/hyp3rd/observe/pkg/instrumentation/worker/ticker`.
 
+For Kafka workloads you can treat each message as a job using `pkg/instrumentation/worker/kafka`:
+
+```go
+import workerkafka "github.com/hyp3rd/observe/pkg/instrumentation/worker/kafka"
+
+kReader := kafka.NewReader(kafka.ReaderConfig{
+  Brokers: []string{"k1:9092"},
+  Topic:   "orders",
+  GroupID: "billing",
+})
+
+consumer := workerkafka.NewConsumer(kReader, workerHelper, client.Runtime().MessagingHelper())
+err := consumer.Run(ctx, func(ctx context.Context, msg kafka.Message) error {
+  return processOrder(ctx, msg)
+})
+```
+
+Each message runs inside both the worker and messaging helpers, combining job-level metrics with messaging semantic conventions while commits happen only after successful processing.
+
 ### Diagnostics Endpoint
 
-Enable `diagnostics.enabled` (default) to expose `/observe/status` on `diagnostics.http_addr`. The endpoint returns JSON snapshots containing service metadata, exporter configuration, instrumentation toggles, config reload counts, trace queue/dropped-span statistics, plus both trace and metric exporter health (protocol, endpoint, last error). Protect the endpoint by setting `diagnostics.auth_token`—requests must supply `Authorization: Bearer <token>`.
+Enable `diagnostics.enabled` (default) to expose `/observe/status` on `diagnostics.http_addr`. The endpoint returns JSON snapshots containing service metadata, exporter configuration, instrumentation toggles, config reload counts, trace queue/dropped-span statistics, and exporter health, including last success/error timestamps and accumulated error count for both trace and metric exporters. Protect the endpoint by setting `diagnostics.auth_token`—requests must supply `Authorization: Bearer <token>`.
 
 ### Config Hot Reload & Logging
 

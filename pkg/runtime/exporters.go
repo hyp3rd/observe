@@ -41,11 +41,13 @@ type exporterBundle struct {
 }
 
 type traceExporterStats struct {
-	queueLimit int64
-	dropped    atomic.Int64
-	protocol   string
-	endpoint   string
-	lastError  atomic.Pointer[exporterError]
+	queueLimit  int64
+	dropped     atomic.Int64
+	protocol    string
+	endpoint    string
+	lastError   atomic.Pointer[exporterError]
+	lastSuccess atomic.Pointer[time.Time]
+	errorCount  atomic.Int64
 }
 
 type exporterError struct {
@@ -54,9 +56,11 @@ type exporterError struct {
 }
 
 type metricExporterStats struct {
-	protocol  string
-	endpoint  string
-	lastError atomic.Pointer[exporterError]
+	protocol    string
+	endpoint    string
+	lastError   atomic.Pointer[exporterError]
+	lastSuccess atomic.Pointer[time.Time]
+	errorCount  atomic.Int64
 }
 
 func newTraceExporterStats(cfg *config.OTLPConfig) *traceExporterStats {
@@ -90,10 +94,20 @@ func (s *traceExporterStats) recordError(err error) {
 		return
 	}
 
+	s.errorCount.Add(1)
 	s.lastError.Store(&exporterError{
 		message: err.Error(),
 		time:    time.Now().UTC(),
 	})
+}
+
+func (s *traceExporterStats) recordSuccess() {
+	if s == nil {
+		return
+	}
+
+	ts := time.Now().UTC()
+	s.lastSuccess.Store(&ts)
 }
 
 func (s *traceExporterStats) statusSnapshot() diagnostics.ExporterStatus {
@@ -105,6 +119,12 @@ func (s *traceExporterStats) statusSnapshot() diagnostics.ExporterStatus {
 		status.LastError = last.message
 		status.LastErrorTime = last.time
 	}
+
+	if success := s.lastSuccess.Load(); success != nil {
+		status.LastSuccessTime = success.UTC()
+	}
+
+	status.ErrorCount = s.errorCount.Load()
 
 	return status
 }
@@ -126,10 +146,20 @@ func (s *metricExporterStats) recordError(err error) {
 		return
 	}
 
+	s.errorCount.Add(1)
 	s.lastError.Store(&exporterError{
 		message: err.Error(),
 		time:    time.Now().UTC(),
 	})
+}
+
+func (s *metricExporterStats) recordSuccess() {
+	if s == nil {
+		return
+	}
+
+	ts := time.Now().UTC()
+	s.lastSuccess.Store(&ts)
 }
 
 func (s *metricExporterStats) statusSnapshot() diagnostics.ExporterStatus {
@@ -146,6 +176,12 @@ func (s *metricExporterStats) statusSnapshot() diagnostics.ExporterStatus {
 		status.LastError = last.message
 		status.LastErrorTime = last.time
 	}
+
+	if success := s.lastSuccess.Load(); success != nil {
+		status.LastSuccessTime = success.UTC()
+	}
+
+	status.ErrorCount = s.errorCount.Load()
 
 	return status
 }
@@ -487,6 +523,10 @@ func (s *spanExporterWithStats) ExportSpans(ctx context.Context, spans []sdktrac
 		return ewrap.Wrap(err, "export spans")
 	}
 
+	if s.stats != nil {
+		s.stats.recordSuccess()
+	}
+
 	return nil
 }
 
@@ -523,6 +563,10 @@ func (m *metricExporterWithStats) Export(ctx context.Context, rm *metricdata.Res
 		}
 
 		return ewrap.Wrap(err, "export metrics")
+	}
+
+	if m.stats != nil {
+		m.stats.recordSuccess()
 	}
 
 	return nil

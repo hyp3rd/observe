@@ -156,7 +156,7 @@ linters:
           disabled: false
           arguments:
             - max-lit-count: "3"
-              allow-strs: '"","-",".","unknown","module","http","trace_id_ratio","always_on","grpc"'
+              allow-strs: '"","-",".","unknown","module","http","trace_id_ratio","always_on","grpc","orders"'
               allow-ints: "-1,0,1,2,10,512,1024,2048,0o600,0o644,0o700,0o755,0666,0755"
               allow-floats: "0.0,1.0"
 
@@ -197,6 +197,7 @@ linters:
       allow-packages:
         - runtime
         - ticker
+        - kafka
         - example
         - main
 
