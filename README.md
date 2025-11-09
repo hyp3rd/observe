@@ -151,6 +151,8 @@ This template follows the [Standard Go Project Layout](https://github.com/golang
 
 Observe ships with a reusable OpenTelemetry bootstrap library under `pkg/observe`.
 
+For a full breakdown of the available instrumentation packs, their configuration toggles, and adapter helpers (HTTP, gRPC, SQL, messaging, Kafka, worker), see [docs/instrumentation.md](docs/instrumentation.md).
+
 ### Quick Start
 
 ```go

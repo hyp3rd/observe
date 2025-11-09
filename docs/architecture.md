@@ -103,11 +103,13 @@ Defaults <- YAML <- Remote <- Env <- Code overrides
 ### Message Queues
 
 - Producer/consumer wrappers for NATS, Kafka, Pub/Sub; consistent attributes (messaging.system, operation).
+- Kafka adapters wrap `segmentio/kafka-go` writers/readers, automatically invoking the messaging helper for publish/consume operations.
 - Optional batching spans for bulk publish/ack.
 
 ### Background/Worker
 
-- Helpers for cron/worker pools to emit heartbeat metrics and job outcome spans.
+- Helper instrumentation wraps cron/job runners, emitting spans and counters with success/error tagging.
+- Worker helpers are exposed through `Runtime.WorkerHelper()` when `instrumentation.worker.enabled` is set.
 
 Instrumentation packs share a base module that fetches tracer/meter handles lazily and registers health metrics.
 
@@ -126,7 +128,7 @@ Instrumentation packs share a base module that fetches tracer/meter handles lazi
 
 ## 10. Diagnostics & Self Telemetry
 
-- `/observe/status` returns exporter health, sampler mode, last error, config version hash. Optional auth via token/header.
+- `/observe/status` returns exporter health (protocol, endpoint, last error timestamp), sampler mode, queue limit, dropped spans, instrumentation toggles, and config reload count. Optional auth via token/header (`diagnostics.auth_token`).
 - `runtime_metrics` instrument records queue size, dropped spans, config reload counts, instrumentation enablement status.
 - Panic/failure hooks emit structured events and escalate via logging adapters.
 
