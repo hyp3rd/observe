@@ -54,7 +54,8 @@ repos:
       - id: go-mod
         name: go-mod
         language: system
-        entry: ./.pre-commit/go-mod
+        entry: ./.pre-commit/go-mod-hook
+        require_serial: true
       - id: gci
         name: gci
         language: system

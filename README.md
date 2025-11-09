@@ -185,9 +185,9 @@ func main() {
 Configuration sources merge in the following order:
 
 1. Built-in defaults (`pkg/config/defaults.go`).
-2. Project-level `observe.yaml` (optional).
-3. Environment variables prefixed with `OBSERVE_` (use double underscores to separate sections, e.g. `OBSERVE_SERVICE__NAME`).
-4. Runtime overrides supplied via `observe.WithConfig`.
+1. Project-level `observe.yaml` (optional).
+1. Environment variables prefixed with `OBSERVE_` (use double underscores to separate sections, e.g. `OBSERVE_SERVICE__NAME`).
+1. Runtime overrides supplied via `observe.WithConfig`.
 
 Environment variables accept comma-separated lists for slice fields (for example, `OBSERVE_INSTRUMENTATION__HTTP__IGNORED_ROUTES=/healthz,/readyz`).
 
@@ -223,6 +223,18 @@ grpcServer := grpc.NewServer(
 ```
 
 The HTTP middleware emits RED metrics and spans following OTEL semantic conventions. The gRPC interceptors capture spans for both server and client sides with optional metadata allowlists.
+
+### SQL Instrumentation
+
+When `instrumentation.sql.enabled` is true, use the SQL helper to register or open instrumented drivers:
+
+```go
+sqlHelper := client.Runtime().SQLHelper()
+driverName, err := sqlHelper.Register("postgres")
+db, err := sqlHelper.Open(driverName, os.Getenv("PG_DSN"))
+```
+
+Set `instrumentation.sql.collect_queries` to `false` to redact `db.statement` attributes if needed.
 
 ### Diagnostics Endpoint
 

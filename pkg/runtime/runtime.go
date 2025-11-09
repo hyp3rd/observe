@@ -22,6 +22,7 @@ import (
 	"github.com/hyp3rd/observe/pkg/diagnostics"
 	observegrpc "github.com/hyp3rd/observe/pkg/instrumentation/grpc"
 	observehttp "github.com/hyp3rd/observe/pkg/instrumentation/http"
+	observesql "github.com/hyp3rd/observe/pkg/instrumentation/sql"
 )
 
 // Runtime encapsulates the active telemetry providers and lifecycle hooks.
@@ -34,6 +35,7 @@ type Runtime struct {
 	httpMiddleware *observehttp.Middleware
 	grpcServerInt  grpc.UnaryServerInterceptor
 	grpcClientInt  grpc.UnaryClientInterceptor
+	sqlHelper      *observesql.Helper
 	diagServer     *diagnostics.Server
 	startTime      time.Time
 	lastReload     time.Time
@@ -93,6 +95,10 @@ func New(ctx context.Context, cfg config.Config) (*Runtime, error) {
 		rt.grpcClientInt = interceptors.UnaryClient()
 	}
 
+	if cfg.Instrumentation.SQL.Enabled {
+		rt.sqlHelper = observesql.NewHelper(cfg.Instrumentation.SQL)
+	}
+
 	if cfg.Diagnostics.Enabled {
 		server := diagnostics.NewServer(cfg.Diagnostics, rt)
 
@@ -138,6 +144,11 @@ func (r *Runtime) GRPCUnaryServerInterceptor() grpc.UnaryServerInterceptor {
 // GRPCUnaryClientInterceptor exposes the unary client interceptor when enabled.
 func (r *Runtime) GRPCUnaryClientInterceptor() grpc.UnaryClientInterceptor {
 	return r.grpcClientInt
+}
+
+// SQLHelper exposes the SQL instrumentation helper when enabled.
+func (r *Runtime) SQLHelper() *observesql.Helper {
+	return r.sqlHelper
 }
 
 // Shutdown releases resources and flushes telemetry.

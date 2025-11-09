@@ -3,6 +3,7 @@ module github.com/hyp3rd/observe
 go 1.25.4
 
 require (
+	github.com/XSAM/otelsql v0.40.0
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/hyp3rd/ewrap v1.3.0
 	github.com/mitchellh/mapstructure v1.5.0
