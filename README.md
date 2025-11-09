@@ -236,9 +236,26 @@ db, err := sqlHelper.Open(driverName, os.Getenv("PG_DSN"))
 
 Set `instrumentation.sql.collect_queries` to `false` to redact `db.statement` attributes if needed.
 
+### Messaging Helpers
+
+Enable `instrumentation.messaging.enabled` to access publish/consume helpers:
+
+```go
+msgHelper := client.Runtime().MessagingHelper()
+publishInfo := messaging.PublishInfo{
+    System:      "kafka",
+    Destination: "orders",
+}
+err := msgHelper.InstrumentPublish(ctx, publishInfo, func(ctx context.Context) error {
+    return producer.SendMessage(ctx, msg)
+})
+```
+
+The helper emits spans using OTEL messaging semantic conventions and records counters/latencies for both producers and consumers.
+
 ### Diagnostics Endpoint
 
-Enable `diagnostics.enabled` (default) to expose `/observe/status` on `diagnostics.http_addr`. The endpoint returns JSON snapshots containing service metadata, exporter configuration, and instrumentation toggles. Protect the endpoint by setting `diagnostics.auth_token`—requests must supply `Authorization: Bearer <token>`.
+Enable `diagnostics.enabled` (default) to expose `/observe/status` on `diagnostics.http_addr`. The endpoint returns JSON snapshots containing service metadata, exporter configuration, instrumentation toggles, config reload counts, and trace queue/dropped-span statistics. Protect the endpoint by setting `diagnostics.auth_token`—requests must supply `Authorization: Bearer <token>`.
 
 ### Config Hot Reload & Logging
 

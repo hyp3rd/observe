@@ -11,7 +11,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/metric"
-	semconv "go.opentelemetry.io/otel/semconv/v1.24.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.37.0"
 	"go.opentelemetry.io/otel/trace"
 
 	"github.com/hyp3rd/observe/pkg/config"
@@ -68,7 +68,7 @@ func (m *Middleware) Handler(next http.Handler) http.Handler {
 		}
 
 		attrs := []attribute.KeyValue{
-			semconv.HTTPMethodKey.String(r.Method),
+			semconv.HTTPRequestMethodKey.String(r.Method),
 			semconv.HTTPRouteKey.String(route),
 		}
 
@@ -85,7 +85,7 @@ func (m *Middleware) Handler(next http.Handler) http.Handler {
 		next.ServeHTTP(rr, r.WithContext(ctx))
 
 		duration := time.Since(start)
-		statusAttr := semconv.HTTPStatusCodeKey.Int(rr.status)
+		statusAttr := semconv.HTTPResponseStatusCodeKey.Int(rr.status)
 
 		attrs = append(attrs, statusAttr)
 		if host := clientIP(r); host != "" {

@@ -7,7 +7,7 @@ import (
 	"github.com/XSAM/otelsql"
 	"github.com/hyp3rd/ewrap"
 	"go.opentelemetry.io/otel/attribute"
-	semconv "go.opentelemetry.io/otel/semconv/v1.24.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.37.0"
 
 	"github.com/hyp3rd/observe/pkg/config"
 )
@@ -76,7 +76,7 @@ func (h *Helper) options(driverName string, userOpts ...otelsql.Option) []otelsq
 
 	attrs := []attribute.KeyValue{}
 	if driverName != "" {
-		attrs = append(attrs, semconv.DBSystemKey.String(driverName))
+		attrs = append(attrs, semconv.DBSystemNameKey.String(driverName))
 	}
 
 	final := []otelsql.Option{

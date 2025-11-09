@@ -19,15 +19,18 @@ import (
 
 // Snapshot captures the current runtime configuration for diagnostics endpoints.
 type Snapshot struct {
-	ServiceName      string          `json:"service_name"`
-	ServiceVersion   string          `json:"service_version"`
-	Environment      string          `json:"environment"`
-	SamplingMode     string          `json:"sampling_mode"`
-	ExporterEndpoint string          `json:"exporter_endpoint"`
-	StartTime        time.Time       `json:"start_time"`
-	LastReloadTime   time.Time       `json:"last_reload_time"`
-	Instrumentation  map[string]bool `json:"instrumentation"`
-	Timestamp        time.Time       `json:"timestamp"`
+	ServiceName       string          `json:"service_name"`
+	ServiceVersion    string          `json:"service_version"`
+	Environment       string          `json:"environment"`
+	SamplingMode      string          `json:"sampling_mode"`
+	ExporterEndpoint  string          `json:"exporter_endpoint"`
+	StartTime         time.Time       `json:"start_time"`
+	LastReloadTime    time.Time       `json:"last_reload_time"`
+	Instrumentation   map[string]bool `json:"instrumentation"`
+	ConfigReloadCount int64           `json:"config_reload_count"`
+	TraceQueueLimit   int64           `json:"trace_queue_limit"`
+	TraceDroppedSpans int64           `json:"trace_dropped_spans"`
+	Timestamp         time.Time       `json:"timestamp"`
 }
 
 // SnapshotProvider supplies diagnostic snapshots.

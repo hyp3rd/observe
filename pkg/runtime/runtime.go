@@ -14,7 +14,7 @@ import (
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
-	semconv "go.opentelemetry.io/otel/semconv/v1.24.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.37.0"
 	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/grpc"
 
@@ -22,6 +22,7 @@ import (
 	"github.com/hyp3rd/observe/pkg/diagnostics"
 	observegrpc "github.com/hyp3rd/observe/pkg/instrumentation/grpc"
 	observehttp "github.com/hyp3rd/observe/pkg/instrumentation/http"
+	observemsg "github.com/hyp3rd/observe/pkg/instrumentation/messaging"
 	observesql "github.com/hyp3rd/observe/pkg/instrumentation/sql"
 )
 
@@ -29,21 +30,24 @@ import (
 type Runtime struct {
 	cfg config.Config
 
-	tracerProvider *sdktrace.TracerProvider
-	meterProvider  *sdkmetric.MeterProvider
-	exporters      *exporterBundle
-	httpMiddleware *observehttp.Middleware
-	grpcServerInt  grpc.UnaryServerInterceptor
-	grpcClientInt  grpc.UnaryClientInterceptor
-	metrics        *runtimeMetricsController
-	sqlHelper      *observesql.Helper
-	diagServer     *diagnostics.Server
-	startTime      time.Time
-	lastReload     time.Time
+	tracerProvider  *sdktrace.TracerProvider
+	meterProvider   *sdkmetric.MeterProvider
+	exporters       *exporterBundle
+	httpMiddleware  *observehttp.Middleware
+	grpcServerInt   grpc.UnaryServerInterceptor
+	grpcClientInt   grpc.UnaryClientInterceptor
+	messagingHelper *observemsg.Helper
+	metrics         *runtimeMetricsController
+	sqlHelper       *observesql.Helper
+	diagServer      *diagnostics.Server
+	startTime       time.Time
+	lastReload      time.Time
 
 	mu    sync.RWMutex
 	state runtimeState
 	once  sync.Once
+
+	metricsState *MetricsState
 }
 
 type runtimeState struct {
@@ -100,6 +104,15 @@ func New(ctx context.Context, cfg config.Config) (*Runtime, error) {
 		rt.sqlHelper = observesql.NewHelper(cfg.Instrumentation.SQL)
 	}
 
+	if cfg.Instrumentation.Messaging.Enabled {
+		mHelper, err := observemsg.NewHelper(tp, mp)
+		if err != nil {
+			return nil, ewrap.Wrap(err, "init messaging instrumentation")
+		}
+
+		rt.messagingHelper = mHelper
+	}
+
 	if cfg.Diagnostics.Enabled {
 		server := diagnostics.NewServer(cfg.Diagnostics, rt)
 
@@ -152,11 +165,18 @@ func (r *Runtime) SQLHelper() *observesql.Helper {
 	return r.sqlHelper
 }
 
+// MessagingHelper exposes the messaging instrumentation helper when enabled.
+func (r *Runtime) MessagingHelper() *observemsg.Helper {
+	return r.messagingHelper
+}
+
 // InitMetrics wires runtime-level metrics if enabled in configuration.
 func (r *Runtime) InitMetrics(state *MetricsState) error {
 	if !r.cfg.Instrumentation.RuntimeMetrics.Enabled {
 		return nil
 	}
+
+	r.metricsState = state
 
 	controller := &runtimeMetricsController{
 		state: state,
@@ -300,7 +320,7 @@ func buildResource(ctx context.Context, svc config.ServiceConfig) (*resource.Res
 	attrs := []attribute.KeyValue{
 		semconv.ServiceNameKey.String(svc.Name),
 		semconv.ServiceVersionKey.String(svc.Version),
-		semconv.DeploymentEnvironmentKey.String(svc.Environment),
+		semconv.DeploymentEnvironmentNameKey.String(svc.Environment),
 	}
 	if svc.Namespace != "" {
 		attrs = append(attrs, semconv.ServiceNamespaceKey.String(svc.Namespace))
@@ -363,6 +383,14 @@ func (r *Runtime) Snapshot() diagnostics.Snapshot {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
+	queueLimit := int64(0)
+	droppedSpans := int64(0)
+
+	if r.exporters != nil && r.exporters.traceStats != nil {
+		queueLimit = r.exporters.traceStats.queueLimit
+		droppedSpans = r.exporters.traceStats.dropped.Load()
+	}
+
 	return diagnostics.Snapshot{
 		ServiceName:      r.cfg.Service.Name,
 		ServiceVersion:   r.cfg.Service.Version,
@@ -374,10 +402,13 @@ func (r *Runtime) Snapshot() diagnostics.Snapshot {
 		Instrumentation: map[string]bool{
 			"http":           r.httpMiddleware != nil,
 			"grpc":           r.grpcServerInt != nil,
-			"sql":            r.cfg.Instrumentation.SQL.Enabled,
-			"messaging":      r.cfg.Instrumentation.Messaging.Enabled,
-			"runtimeMetrics": r.cfg.Instrumentation.RuntimeMetrics.Enabled,
+			"sql":            r.sqlHelper != nil,
+			"messaging":      r.messagingHelper != nil,
+			"runtimeMetrics": r.metrics != nil,
 		},
+		ConfigReloadCount: reloadCount(r.metricsState),
+		TraceQueueLimit:   queueLimit,
+		TraceDroppedSpans: droppedSpans,
 	}
 }
 
@@ -387,4 +418,12 @@ func endpointForSnapshot(cfg config.Config) string {
 	}
 
 	return cfg.Exporters.OTLP.Endpoint
+}
+
+func reloadCount(state *MetricsState) int64 {
+	if state == nil {
+		return 0
+	}
+
+	return state.ConfigReloads()
 }

@@ -8,8 +8,6 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
-
-	"github.com/hyp3rd/observe/internal/constants"
 )
 
 type runtimeMetricsController struct {
@@ -22,7 +20,7 @@ func (c *runtimeMetricsController) start(rt *Runtime, provider *sdkmetric.MeterP
 		runtimemetrics.WithMeterProvider(provider),
 	)
 	if err != nil {
-		return ewrap.Wrap(err, "start runtime metrics", ewrap.WithRetry(constants.DefaultRetryAttempts, constants.DefaultRetryDelay))
+		return ewrap.Wrap(err, "start runtime metrics")
 	}
 
 	instruments, err := newRuntimeInstruments(provider)
@@ -48,11 +46,7 @@ func (c *runtimeMetricsController) shutdown() error {
 	if c.registration != nil {
 		err := c.registration.Unregister()
 		if err != nil {
-			return ewrap.Wrap(
-				err,
-				"unregister runtime metrics",
-				ewrap.WithRetry(constants.DefaultRetryAttempts, constants.DefaultRetryDelay),
-			)
+			return ewrap.Wrap(err, "unregister runtime metrics")
 		}
 	}
 
@@ -129,6 +123,7 @@ func (ri *runtimeInstruments) registerCallback(rt *Runtime, state *MetricsState)
 			ri.observeModule(observer, rt.httpMiddleware != nil, "http")
 			ri.observeModule(observer, rt.grpcServerInt != nil, "grpc")
 			ri.observeModule(observer, rt.sqlHelper != nil, "sql")
+			ri.observeModule(observer, rt.messagingHelper != nil, "messaging")
 
 			ri.observeTracerStats(observer, rt.exporters)
 
@@ -140,8 +135,7 @@ func (ri *runtimeInstruments) registerCallback(rt *Runtime, state *MetricsState)
 		ri.droppedCounter,
 	)
 	if err != nil {
-		return nil, ewrap.Wrap(err, "register runtime metrics callback",
-			ewrap.WithRetry(constants.DefaultRetryAttempts, constants.DefaultRetryDelay))
+		return nil, ewrap.Wrap(err, "register runtime metrics callback")
 	}
 
 	return reg, nil
