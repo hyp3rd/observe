@@ -253,6 +253,13 @@ err := msgHelper.InstrumentPublish(ctx, publishInfo, func(ctx context.Context) e
 
 The helper emits spans using OTEL messaging semantic conventions and records counters/latencies for both producers and consumers.
 
+Kafka clients can use the adapters under `pkg/instrumentation/messaging/kafka`:
+
+```go
+writer := kafka.NewWriter(&kafka.Writer{Addr: kafka.TCP("k1:9092")}, client.Runtime().MessagingHelper())
+reader := kafka.NewReader(kafka.NewReader(kafka.ReaderConfig{Brokers: []string{"k1:9092"}, Topic: "orders"}), client.Runtime().MessagingHelper())
+```
+
 ### Worker Helpers
 
 Enable `instrumentation.worker.enabled` to instrument background jobs:
