@@ -9,6 +9,12 @@ import (
 	"go.opentelemetry.io/otel/trace"
 
 	"github.com/hyp3rd/observe/pkg/config"
+	"github.com/hyp3rd/observe/pkg/diagnostics"
+)
+
+const (
+	collectorEndpoint = "collector:4318"
+	droppedSpans      = 7
 )
 
 func TestSamplerFromConfigModes(t *testing.T) {
@@ -105,8 +111,8 @@ func TestEndpointForSnapshot(t *testing.T) {
 		t.Fatalf("expected empty endpoint, got %q", got)
 	}
 
-	cfg.Exporters.OTLP = &config.OTLPConfig{Endpoint: "collector:4318"}
-	if got := endpointForSnapshot(cfg); got != "collector:4318" {
+	cfg.Exporters.OTLP = &config.OTLPConfig{Endpoint: collectorEndpoint}
+	if got := endpointForSnapshot(cfg); got != collectorEndpoint {
 		t.Fatalf("expected endpoint collector:4318, got %q", got)
 	}
 }
@@ -173,6 +179,64 @@ func TestSnapshotBasic(t *testing.T) {
 
 	snap := rt.Snapshot()
 
+	assertSnapshotMetadata(t, snap, start, reload)
+	assertInstrumentationDisabled(t, snap)
+	assertSnapshotDefaults(t, snap)
+}
+
+func TestSnapshotExporterStatus(t *testing.T) {
+	t.Parallel()
+
+	traceStats := &traceExporterStats{
+		queueLimit: 512,
+		protocol:   "grpc",
+		endpoint:   "collector:4317",
+	}
+	traceStats.dropped.Store(droppedSpans)
+
+	metricStats := &metricExporterStats{
+		protocol: "http",
+		endpoint: collectorEndpoint,
+	}
+
+	rt := &Runtime{
+		cfg: config.Config{
+			Service: config.ServiceConfig{
+				Name: "svc",
+			},
+		},
+		exporters: &exporterBundle{
+			traceStats:  traceStats,
+			metricStats: metricStats,
+		},
+	}
+
+	snap := rt.Snapshot()
+
+	if snap.TraceQueueLimit != 512 {
+		t.Fatalf("expected trace queue limit 512, got %d", snap.TraceQueueLimit)
+	}
+
+	if snap.TraceDroppedSpans != droppedSpans {
+		t.Fatalf("expected dropped spans %d, got %d", droppedSpans, snap.TraceDroppedSpans)
+	}
+
+	if snap.TraceExporter.Endpoint != "collector:4317" {
+		t.Fatalf("expected trace exporter endpoint collector:4317, got %s", snap.TraceExporter.Endpoint)
+	}
+
+	if snap.MetricExporter.Endpoint != collectorEndpoint {
+		t.Fatalf("expected metric exporter endpoint collector:4318, got %s", snap.MetricExporter.Endpoint)
+	}
+
+	if snap.MetricExporter.Protocol != "http" {
+		t.Fatalf("expected metric protocol http, got %s", snap.MetricExporter.Protocol)
+	}
+}
+
+func assertSnapshotMetadata(t *testing.T, snap diagnostics.Snapshot, start, reload time.Time) {
+	t.Helper()
+
 	if snap.ServiceName != "svc" {
 		t.Fatalf("expected service name svc, got %s", snap.ServiceName)
 	}
@@ -196,6 +260,10 @@ func TestSnapshotBasic(t *testing.T) {
 	if !snap.LastReloadTime.Equal(reload) {
 		t.Fatalf("expected last reload %v, got %v", reload, snap.LastReloadTime)
 	}
+}
+
+func assertInstrumentationDisabled(t *testing.T, snap diagnostics.Snapshot) {
+	t.Helper()
 
 	keys := []string{"http", "grpc", "sql", "messaging", "worker", "runtimeMetrics"}
 	for _, key := range keys {
@@ -208,6 +276,10 @@ func TestSnapshotBasic(t *testing.T) {
 			t.Fatalf("expected instrumentation %s to be disabled", key)
 		}
 	}
+}
+
+func assertSnapshotDefaults(t *testing.T, snap diagnostics.Snapshot) {
+	t.Helper()
 
 	if snap.TraceQueueLimit != 0 {
 		t.Fatalf("expected trace queue limit 0, got %d", snap.TraceQueueLimit)
@@ -223,5 +295,9 @@ func TestSnapshotBasic(t *testing.T) {
 
 	if snap.ExporterEndpoint != "" {
 		t.Fatalf("expected empty exporter endpoint, got %s", snap.ExporterEndpoint)
+	}
+
+	if snap.MetricExporter.Endpoint != "" {
+		t.Fatalf("expected empty metric exporter endpoint, got %s", snap.MetricExporter.Endpoint)
 	}
 }

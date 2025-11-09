@@ -31,6 +31,7 @@ type Snapshot struct {
 	TraceQueueLimit   int64           `json:"trace_queue_limit"`
 	TraceDroppedSpans int64           `json:"trace_dropped_spans"`
 	TraceExporter     ExporterStatus  `json:"trace_exporter"`
+	MetricExporter    ExporterStatus  `json:"metric_exporter"`
 	Timestamp         time.Time       `json:"timestamp"`
 }
 

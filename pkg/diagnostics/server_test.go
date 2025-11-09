@@ -35,6 +35,10 @@ func TestHandleStatusReturnsSnapshot(t *testing.T) {
 				LastError:     "boom",
 				LastErrorTime: time.Date(2024, 12, 5, 12, 0, 0, 0, time.UTC),
 			},
+			MetricExporter: diagnostics.ExporterStatus{
+				Protocol: "http",
+				Endpoint: "collector:4318",
+			},
 		},
 	}
 	server := diagnostics.NewServer(
@@ -76,6 +80,10 @@ func TestHandleStatusReturnsSnapshot(t *testing.T) {
 
 	if snapshot.TraceExporter.LastError != "boom" {
 		t.Fatalf("expected last error boom, got %s", snapshot.TraceExporter.LastError)
+	}
+
+	if snapshot.MetricExporter.Endpoint != "collector:4318" {
+		t.Fatalf("expected metric endpoint collector:4318, got %s", snapshot.MetricExporter.Endpoint)
 	}
 }
 

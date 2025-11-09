@@ -16,6 +16,7 @@ import (
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
+	"go.opentelemetry.io/otel/sdk/metric/metricdata"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"google.golang.org/grpc/credentials"
 
@@ -36,6 +37,7 @@ type exporterBundle struct {
 	metricExporter sdkmetric.Exporter
 	metricReader   *sdkmetric.PeriodicReader
 	traceStats     *traceExporterStats
+	metricStats    *metricExporterStats
 }
 
 type traceExporterStats struct {
@@ -49,6 +51,12 @@ type traceExporterStats struct {
 type exporterError struct {
 	message string
 	time    time.Time
+}
+
+type metricExporterStats struct {
+	protocol  string
+	endpoint  string
+	lastError atomic.Pointer[exporterError]
 }
 
 func newTraceExporterStats(cfg *config.OTLPConfig) *traceExporterStats {
@@ -101,6 +109,47 @@ func (s *traceExporterStats) statusSnapshot() diagnostics.ExporterStatus {
 	return status
 }
 
+func newMetricExporterStats(cfg *config.OTLPConfig) *metricExporterStats {
+	protocol := cfg.Protocol
+	if protocol == "" {
+		protocol = "grpc"
+	}
+
+	return &metricExporterStats{
+		protocol: strings.ToLower(protocol),
+		endpoint: cfg.Endpoint,
+	}
+}
+
+func (s *metricExporterStats) recordError(err error) {
+	if s == nil || err == nil {
+		return
+	}
+
+	s.lastError.Store(&exporterError{
+		message: err.Error(),
+		time:    time.Now().UTC(),
+	})
+}
+
+func (s *metricExporterStats) statusSnapshot() diagnostics.ExporterStatus {
+	if s == nil {
+		return diagnostics.ExporterStatus{}
+	}
+
+	status := diagnostics.ExporterStatus{
+		Protocol: s.protocol,
+		Endpoint: s.endpoint,
+	}
+
+	if last := s.lastError.Load(); last != nil {
+		status.LastError = last.message
+		status.LastErrorTime = last.time
+	}
+
+	return status
+}
+
 func newExporterBundle(ctx context.Context, cfg config.ExporterConfig) (*exporterBundle, error) {
 	if cfg.OTLP == nil {
 		return nil, ewrap.New("otlp exporter config is required")
@@ -126,6 +175,12 @@ func newExporterBundle(ctx context.Context, cfg config.ExporterConfig) (*exporte
 		return nil, err
 	}
 
+	metricStats := newMetricExporterStats(cfg.OTLP)
+	metricExp = &metricExporterWithStats{
+		inner: metricExp,
+		stats: metricStats,
+	}
+
 	reader := sdkmetric.NewPeriodicReader(
 		metricExp,
 		sdkmetric.WithInterval(time.Minute),
@@ -136,6 +191,7 @@ func newExporterBundle(ctx context.Context, cfg config.ExporterConfig) (*exporte
 		metricExporter: metricExp,
 		metricReader:   reader,
 		traceStats:     traceStats,
+		metricStats:    metricStats,
 	}, nil
 }
 
@@ -429,6 +485,70 @@ func (s *spanExporterWithStats) ExportSpans(ctx context.Context, spans []sdktrac
 		}
 
 		return ewrap.Wrap(err, "export spans")
+	}
+
+	return nil
+}
+
+type metricExporterWithStats struct {
+	inner sdkmetric.Exporter
+	stats *metricExporterStats
+}
+
+func (m *metricExporterWithStats) Temporality(kind sdkmetric.InstrumentKind) metricdata.Temporality {
+	if m == nil || m.inner == nil {
+		return metricdata.CumulativeTemporality
+	}
+
+	return m.inner.Temporality(kind)
+}
+
+func (m *metricExporterWithStats) Aggregation(kind sdkmetric.InstrumentKind) sdkmetric.Aggregation {
+	if m == nil || m.inner == nil {
+		return sdkmetric.AggregationDefault{}
+	}
+
+	return m.inner.Aggregation(kind)
+}
+
+func (m *metricExporterWithStats) Export(ctx context.Context, rm *metricdata.ResourceMetrics) error {
+	if m == nil || m.inner == nil {
+		return nil
+	}
+
+	err := m.inner.Export(ctx, rm)
+	if err != nil {
+		if m.stats != nil {
+			m.stats.recordError(err)
+		}
+
+		return ewrap.Wrap(err, "export metrics")
+	}
+
+	return nil
+}
+
+func (m *metricExporterWithStats) ForceFlush(ctx context.Context) error {
+	if m == nil || m.inner == nil {
+		return nil
+	}
+
+	err := m.inner.ForceFlush(ctx)
+	if err != nil {
+		return ewrap.Wrap(err, "force flush metric exporter")
+	}
+
+	return nil
+}
+
+func (m *metricExporterWithStats) Shutdown(ctx context.Context) error {
+	if m == nil || m.inner == nil {
+		return nil
+	}
+
+	err := m.inner.Shutdown(ctx)
+	if err != nil {
+		return ewrap.Wrap(err, "shutdown metric exporter")
 	}
 
 	return nil

@@ -277,11 +277,38 @@ err := workerHelper.Instrument(ctx, job, func(ctx context.Context) error {
 })
 ```
 
-Metrics `worker.job.count` and `worker.job.duration_ms` emit with success/error status attributes while traces capture per-job spans.
+Metrics `worker.job.count` and `worker.job.duration_ms` emit with success/error status attributes while traces capture per-job spans. A concrete adapter is available for ticker/cron style jobs:
+
+```go
+import workerticker "github.com/hyp3rd/observe/pkg/instrumentation/worker/ticker"
+
+adapter, err := workerticker.NewAdapter(workerHelper, workerticker.Config{
+  Interval: time.Minute,
+  Job:      job,
+  ErrorHandler: func(err error) {
+    log.Printf("worker failed: %v", err)
+  },
+})
+if err != nil {
+  panic(err)
+}
+
+startCtx, cancel := context.WithCancel(ctx)
+defer cancel()
+
+if err := adapter.Start(startCtx, func(ctx context.Context) error {
+  return doWork(ctx)
+}); err != nil {
+  panic(err)
+}
+defer adapter.Stop(context.Background())
+```
+
+Import path: `github.com/hyp3rd/observe/pkg/instrumentation/worker/ticker`.
 
 ### Diagnostics Endpoint
 
-Enable `diagnostics.enabled` (default) to expose `/observe/status` on `diagnostics.http_addr`. The endpoint returns JSON snapshots containing service metadata, exporter configuration, instrumentation toggles, config reload counts, and trace queue/dropped-span statistics. Protect the endpoint by setting `diagnostics.auth_token`—requests must supply `Authorization: Bearer <token>`.
+Enable `diagnostics.enabled` (default) to expose `/observe/status` on `diagnostics.http_addr`. The endpoint returns JSON snapshots containing service metadata, exporter configuration, instrumentation toggles, config reload counts, trace queue/dropped-span statistics, plus both trace and metric exporter health (protocol, endpoint, last error). Protect the endpoint by setting `diagnostics.auth_token`—requests must supply `Authorization: Bearer <token>`.
 
 ### Config Hot Reload & Logging
 

@@ -42,12 +42,14 @@ Observe ships a set of instrumentation helpers under `pkg/instrumentation`. Each
 - Features:
       - `Helper.Instrument` wraps background jobs.
       - Emits spans + `worker.job.count`/`worker.job.duration_ms` metrics with success/error tagging.
+      - Concrete adapter `pkg/instrumentation/worker/ticker` runs cron/ticker style jobs with graceful stop + error hooks.
 
 ## Diagnostics & Runtime Metrics
 
 - Diagnostics snapshots (`/observe/status`) include:
       - Service metadata, instrumentation toggles, config reload count.
       - Trace exporter protocol/endpoint + last error, queue limit, dropped spans.
+      - Metric exporter protocol/endpoint + last error (mirrors trace fields for parity).
 - Runtime metrics (enable via `instrumentation.runtime_metrics.enabled`):
       - Go runtime metrics via `go.opentelemetry.io/contrib/instrumentation/runtime`.
       - Observe-specific gauges for instrumentation enablement and exporter queue size.

@@ -425,6 +425,7 @@ func (r *Runtime) Snapshot() diagnostics.Snapshot {
 		TraceQueueLimit:   queueLimit,
 		TraceDroppedSpans: droppedSpans,
 		TraceExporter:     exporterStatus(r.exporters),
+		MetricExporter:    metricExporterStatus(r.exporters),
 	}
 }
 
@@ -450,6 +451,14 @@ func exporterStatus(bundle *exporterBundle) diagnostics.ExporterStatus {
 	}
 
 	return bundle.traceStats.statusSnapshot()
+}
+
+func metricExporterStatus(bundle *exporterBundle) diagnostics.ExporterStatus {
+	if bundle == nil || bundle.metricStats == nil {
+		return diagnostics.ExporterStatus{}
+	}
+
+	return bundle.metricStats.statusSnapshot()
 }
 
 func (r *Runtime) startDiagnosticsServer(ctx context.Context, cfg config.DiagnosticsConfig) error {
