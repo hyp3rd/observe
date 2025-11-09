@@ -253,6 +253,23 @@ err := msgHelper.InstrumentPublish(ctx, publishInfo, func(ctx context.Context) e
 
 The helper emits spans using OTEL messaging semantic conventions and records counters/latencies for both producers and consumers.
 
+### Worker Helpers
+
+Enable `instrumentation.worker.enabled` to instrument background jobs:
+
+```go
+workerHelper := client.Runtime().WorkerHelper()
+job := worker.JobInfo{
+  Name:  "sync-users",
+  Queue: "nightly",
+}
+err := workerHelper.Instrument(ctx, job, func(ctx context.Context) error {
+  return doWork(ctx)
+})
+```
+
+Metrics `worker.job.count` and `worker.job.duration_ms` emit with success/error status attributes while traces capture per-job spans.
+
 ### Diagnostics Endpoint
 
 Enable `diagnostics.enabled` (default) to expose `/observe/status` on `diagnostics.http_addr`. The endpoint returns JSON snapshots containing service metadata, exporter configuration, instrumentation toggles, config reload counts, and trace queue/dropped-span statistics. Protect the endpoint by setting `diagnostics.auth_token`—requests must supply `Authorization: Bearer <token>`.

@@ -30,7 +30,16 @@ type Snapshot struct {
 	ConfigReloadCount int64           `json:"config_reload_count"`
 	TraceQueueLimit   int64           `json:"trace_queue_limit"`
 	TraceDroppedSpans int64           `json:"trace_dropped_spans"`
+	TraceExporter     ExporterStatus  `json:"trace_exporter"`
 	Timestamp         time.Time       `json:"timestamp"`
+}
+
+// ExporterStatus describes exporter health for diagnostics.
+type ExporterStatus struct {
+	Protocol      string    `json:"protocol"`
+	Endpoint      string    `json:"endpoint"`
+	LastError     string    `json:"last_error"`
+	LastErrorTime time.Time `json:"last_error_time"`
 }
 
 // SnapshotProvider supplies diagnostic snapshots.
@@ -67,7 +76,7 @@ func (s *Server) Start(ctx context.Context) error {
 
 	s.start.Do(func() {
 		mux := http.NewServeMux()
-		mux.HandleFunc("/observe/status", s.handleStatus)
+		mux.HandleFunc("/observe/status", s.HandleStatus)
 
 		s.server = &http.Server{
 			Addr:              s.cfg.HTTPAddr,
@@ -135,7 +144,8 @@ func (s *Server) Shutdown(ctx context.Context) error {
 	return nil
 }
 
-func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
+// HandleStatus serves the /observe/status endpoint with a JSON snapshot of the runtime status.
+func (s *Server) HandleStatus(w http.ResponseWriter, r *http.Request) {
 	if s.cfg.AuthToken != "" {
 		if !validAuth(r.Header.Get("Authorization"), s.cfg.AuthToken) {
 			w.WriteHeader(http.StatusUnauthorized)

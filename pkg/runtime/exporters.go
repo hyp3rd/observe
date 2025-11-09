@@ -20,6 +20,7 @@ import (
 	"google.golang.org/grpc/credentials"
 
 	"github.com/hyp3rd/observe/pkg/config"
+	"github.com/hyp3rd/observe/pkg/diagnostics"
 )
 
 // ErrTLSNotEnabled is returned when TLS configuration is incomplete.
@@ -40,16 +41,31 @@ type exporterBundle struct {
 type traceExporterStats struct {
 	queueLimit int64
 	dropped    atomic.Int64
+	protocol   string
+	endpoint   string
+	lastError  atomic.Pointer[exporterError]
 }
 
-func newTraceExporterStats(batchCfg config.BatchConfig) *traceExporterStats {
-	limit := int64(batchCfg.MaxQueueSize)
+type exporterError struct {
+	message string
+	time    time.Time
+}
+
+func newTraceExporterStats(cfg *config.OTLPConfig) *traceExporterStats {
+	limit := int64(cfg.Batch.MaxQueueSize)
 	if limit <= 0 {
 		limit = 2048
 	}
 
+	protocol := cfg.Protocol
+	if protocol == "" {
+		protocol = "grpc"
+	}
+
 	return &traceExporterStats{
 		queueLimit: limit,
+		protocol:   strings.ToLower(protocol),
+		endpoint:   cfg.Endpoint,
 	}
 }
 
@@ -59,6 +75,30 @@ func (s *traceExporterStats) recordDrop(n int64) {
 	}
 
 	s.dropped.Add(n)
+}
+
+func (s *traceExporterStats) recordError(err error) {
+	if s == nil || err == nil {
+		return
+	}
+
+	s.lastError.Store(&exporterError{
+		message: err.Error(),
+		time:    time.Now().UTC(),
+	})
+}
+
+func (s *traceExporterStats) statusSnapshot() diagnostics.ExporterStatus {
+	status := diagnostics.ExporterStatus{
+		Protocol: strings.ToLower(s.protocol),
+		Endpoint: s.endpoint,
+	}
+	if last := s.lastError.Load(); last != nil {
+		status.LastError = last.message
+		status.LastErrorTime = last.time
+	}
+
+	return status
 }
 
 func newExporterBundle(ctx context.Context, cfg config.ExporterConfig) (*exporterBundle, error) {
@@ -75,7 +115,7 @@ func newExporterBundle(ctx context.Context, cfg config.ExporterConfig) (*exporte
 		return nil, err
 	}
 
-	traceStats := newTraceExporterStats(cfg.OTLP.Batch)
+	traceStats := newTraceExporterStats(cfg.OTLP)
 	traceExp = &spanExporterWithStats{
 		inner: traceExp,
 		stats: traceStats,
@@ -383,10 +423,15 @@ func (s *spanExporterWithStats) ExportSpans(ctx context.Context, spans []sdktrac
 
 	err := s.inner.ExportSpans(ctx, spans)
 	if err != nil {
-		s.stats.recordDrop(int64(len(spans)))
+		if s.stats != nil {
+			s.stats.recordDrop(int64(len(spans)))
+			s.stats.recordError(err)
+		}
+
+		return ewrap.Wrap(err, "export spans")
 	}
 
-	return ewrap.Wrap(err, "export spans")
+	return nil
 }
 
 func (s *spanExporterWithStats) Shutdown(ctx context.Context) error {

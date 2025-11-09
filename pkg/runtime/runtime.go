@@ -24,6 +24,7 @@ import (
 	observehttp "github.com/hyp3rd/observe/pkg/instrumentation/http"
 	observemsg "github.com/hyp3rd/observe/pkg/instrumentation/messaging"
 	observesql "github.com/hyp3rd/observe/pkg/instrumentation/sql"
+	observeworker "github.com/hyp3rd/observe/pkg/instrumentation/worker"
 )
 
 // Runtime encapsulates the active telemetry providers and lifecycle hooks.
@@ -39,6 +40,7 @@ type Runtime struct {
 	messagingHelper *observemsg.Helper
 	metrics         *runtimeMetricsController
 	sqlHelper       *observesql.Helper
+	workerHelper    *observeworker.Helper
 	diagServer      *diagnostics.Server
 	startTime       time.Time
 	lastReload      time.Time
@@ -55,6 +57,8 @@ type runtimeState struct {
 }
 
 // New creates a Runtime from the supplied Config.
+//
+//nolint:revive // cognitive-complexity: acceptable for a constructor function.
 func New(ctx context.Context, cfg config.Config) (*Runtime, error) {
 	exporters, err := newExporterBundle(ctx, cfg.Exporters)
 	if err != nil {
@@ -113,15 +117,20 @@ func New(ctx context.Context, cfg config.Config) (*Runtime, error) {
 		rt.messagingHelper = mHelper
 	}
 
-	if cfg.Diagnostics.Enabled {
-		server := diagnostics.NewServer(cfg.Diagnostics, rt)
+	if cfg.Instrumentation.Worker.Enabled {
+		wHelper, err := observeworker.NewHelper(tp, mp)
+		if err != nil {
+			return nil, ewrap.Wrap(err, "init worker instrumentation")
+		}
 
-		err := server.Start(ctx)
+		rt.workerHelper = wHelper
+	}
+
+	if cfg.Diagnostics.Enabled {
+		err := rt.startDiagnosticsServer(ctx, cfg.Diagnostics)
 		if err != nil {
 			return nil, ewrap.Wrap(err, "start diagnostics server")
 		}
-
-		rt.diagServer = server
 	}
 
 	return rt, nil
@@ -168,6 +177,11 @@ func (r *Runtime) SQLHelper() *observesql.Helper {
 // MessagingHelper exposes the messaging instrumentation helper when enabled.
 func (r *Runtime) MessagingHelper() *observemsg.Helper {
 	return r.messagingHelper
+}
+
+// WorkerHelper exposes the worker instrumentation helper when enabled.
+func (r *Runtime) WorkerHelper() *observeworker.Helper {
+	return r.workerHelper
 }
 
 // InitMetrics wires runtime-level metrics if enabled in configuration.
@@ -404,11 +418,13 @@ func (r *Runtime) Snapshot() diagnostics.Snapshot {
 			"grpc":           r.grpcServerInt != nil,
 			"sql":            r.sqlHelper != nil,
 			"messaging":      r.messagingHelper != nil,
+			"worker":         r.workerHelper != nil,
 			"runtimeMetrics": r.metrics != nil,
 		},
 		ConfigReloadCount: reloadCount(r.metricsState),
 		TraceQueueLimit:   queueLimit,
 		TraceDroppedSpans: droppedSpans,
+		TraceExporter:     exporterStatus(r.exporters),
 	}
 }
 
@@ -426,4 +442,25 @@ func reloadCount(state *MetricsState) int64 {
 	}
 
 	return state.ConfigReloads()
+}
+
+func exporterStatus(bundle *exporterBundle) diagnostics.ExporterStatus {
+	if bundle == nil || bundle.traceStats == nil {
+		return diagnostics.ExporterStatus{}
+	}
+
+	return bundle.traceStats.statusSnapshot()
+}
+
+func (r *Runtime) startDiagnosticsServer(ctx context.Context, cfg config.DiagnosticsConfig) error {
+	server := diagnostics.NewServer(cfg, r)
+
+	err := server.Start(ctx)
+	if err != nil {
+		return ewrap.Wrap(err, "start diagnostics server")
+	}
+
+	r.diagServer = server
+
+	return nil
 }

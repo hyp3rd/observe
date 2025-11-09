@@ -67,6 +67,9 @@ func DefaultConfig() Config {
 			Messaging: MessagingInstrumentationConfig{
 				Enabled: false,
 			},
+			Worker: WorkerInstrumentationConfig{
+				Enabled: false,
+			},
 			RuntimeMetrics: RuntimeMetricsConfig{
 				Enabled: true,
 			},

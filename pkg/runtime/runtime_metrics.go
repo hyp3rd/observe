@@ -124,6 +124,7 @@ func (ri *runtimeInstruments) registerCallback(rt *Runtime, state *MetricsState)
 			ri.observeModule(observer, rt.grpcServerInt != nil, "grpc")
 			ri.observeModule(observer, rt.sqlHelper != nil, "sql")
 			ri.observeModule(observer, rt.messagingHelper != nil, "messaging")
+			ri.observeModule(observer, rt.workerHelper != nil, "worker")
 
 			ri.observeTracerStats(observer, rt.exporters)
 

@@ -68,11 +68,17 @@ type InstrumentationConfig struct {
 	GRPC           GRPCInstrumentationConfig      `yaml:"grpc"            json:"grpc"`
 	SQL            SQLInstrumentationConfig       `yaml:"sql"             json:"sql"`
 	Messaging      MessagingInstrumentationConfig `yaml:"messaging"       json:"messaging"`
+	Worker         WorkerInstrumentationConfig    `yaml:"worker"          json:"worker"`
 	RuntimeMetrics RuntimeMetricsConfig           `yaml:"runtime_metrics" json:"runtime_metrics"`
 }
 
 // MessagingInstrumentationConfig configures messaging instrumentation.
 type MessagingInstrumentationConfig struct {
+	Enabled bool `yaml:"enabled" json:"enabled"`
+}
+
+// WorkerInstrumentationConfig configures worker instrumentation.
+type WorkerInstrumentationConfig struct {
 	Enabled bool `yaml:"enabled" json:"enabled"`
 }
 
