@@ -2,10 +2,13 @@ package observe
 
 import (
 	"context"
+	"time"
 
 	"github.com/hyp3rd/observe/pkg/config"
 	"github.com/hyp3rd/observe/pkg/logging"
 )
+
+const reloadDebounceDefault = 250 * time.Millisecond
 
 // Option mutates initialization settings.
 type Option func(*options)
@@ -16,6 +19,7 @@ type options struct {
 	logger         logging.Adapter
 	loggerOverride bool
 	watchConfig    bool
+	reloadDebounce time.Duration
 }
 
 func defaultOptions() options {
@@ -24,8 +28,9 @@ func defaultOptions() options {
 			config.FileLoader{},
 			config.EnvLoader{},
 		},
-		logger:      nil,
-		watchConfig: true,
+		logger:         nil,
+		watchConfig:    true,
+		reloadDebounce: reloadDebounceDefault,
 	}
 }
 
@@ -63,6 +68,13 @@ func WithLogger(adapter logging.Adapter) Option {
 func WithConfigWatcher(enabled bool) Option {
 	return func(opt *options) {
 		opt.watchConfig = enabled
+	}
+}
+
+// WithReloadDebounce sets the debounce interval for config reload triggers.
+func WithReloadDebounce(interval time.Duration) Option {
+	return func(opt *options) {
+		opt.reloadDebounce = interval
 	}
 }
 

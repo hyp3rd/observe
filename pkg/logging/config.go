@@ -102,6 +102,10 @@ func (infoDisabledAdapter) Info(_ context.Context, _ string, _ ...attribute.KeyV
 	// drop info level
 }
 
+func (infoDisabledAdapter) Debug(_ context.Context, _ string, _ ...attribute.KeyValue) {
+	// drop debug level
+}
+
 func (a infoDisabledAdapter) Error(ctx context.Context, err error, msg string, attrs ...attribute.KeyValue) {
 	a.inner.Error(ctx, err, msg, attrs...)
 }
@@ -133,6 +137,12 @@ type samplingAdapter struct {
 func (s *samplingAdapter) Info(ctx context.Context, msg string, attrs ...attribute.KeyValue) {
 	if s.shouldLog() {
 		s.inner.Info(ctx, msg, attrs...)
+	}
+}
+
+func (s *samplingAdapter) Debug(ctx context.Context, msg string, attrs ...attribute.KeyValue) {
+	if s.shouldLog() {
+		s.inner.Debug(ctx, msg, attrs...)
 	}
 }
 

@@ -338,7 +338,9 @@ adapter := logging.NewSlogAdapter(slog.NewJSONHandler(os.Stdout, nil))
 client, err := observe.Init(ctx, observe.WithLogger(adapter))
 ```
 
-Available adapters: `slog`, `zap`, `zerolog`, and `log.Logger`, each automatically enriched with trace/span identifiers.
+Available adapters: `slog`, `zap`, `zerolog`, and `log.Logger`, each automatically enriched with trace/span identifiers and a `Debug/Info/Error` triad so you can wire them into existing log pipelines. The logging config supports level, output format, and log sampling.
+
+The config watcher debounces filesystem events (default 250ms, configurable via `observe.WithReloadDebounce`) and fingerprints the last applied configuration. If the file change does not produce a semantic diff the reload is skipped, avoiding unnecessary exporter churn.
 
 ## Troubleshooting
 

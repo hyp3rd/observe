@@ -45,6 +45,15 @@ Observe ships a set of instrumentation helpers under `pkg/instrumentation`. Each
       - Concrete adapter `pkg/instrumentation/worker/ticker` runs cron/ticker style jobs with graceful stop + error hooks.
       - `pkg/instrumentation/worker/kafka` consumes `segmentio/kafka-go` readers, layering worker + messaging helpers with auto commits.
 
+## Logging
+
+- Package: `pkg/logging`
+- Config: `logging.*`
+- Features:
+      - Adapters for `slog`, `zap`, `zerolog`, and stdlib loggers with trace/span correlation baked in.
+      - Debug/Info/Error surface shared by all runtime components.
+      - Built-in level filtering + probabilistic sampling driven by config to reduce chatter in noisy services.
+
 ## Diagnostics & Runtime Metrics
 
 - Diagnostics snapshots (`/observe/status`) include:

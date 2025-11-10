@@ -55,7 +55,7 @@ Core scenarios:
 1. **Resource Detection**: Detect environment (k8s, ECS, Lambda, bare metal) and merge with custom resource attributes supplied by integrators.
 1. **Sampling Policies**: Support always-on, always-off, parent-based, and tail-based sampling (pluggable). Provide deterministic per-tenant rate limiting to prevent noisy neighbors.
 1. **Metrics Package**: Common instruments (counters, histograms, gauges) plus helper functions for request/response latency, error counts, queue depth, goroutine/memory stats.
-1. **Logging Integration**: Structured logging helpers that correlate logs with trace/span IDs. Provide adapters for `zap`, `zerolog`, and Go stdlib log/slog.
+1. **Logging Integration**: Structured logging helpers that correlate logs with trace/span IDs. Provide adapters for `slog`, `zap`, `zerolog`, and Go stdlib log/slog plus config-driven level & sampling controls.
 1. **Diagnostics**: Self-telemetry (health metrics) and debug endpoints (e.g., `/observe/status`) gated behind config for field troubleshooting. Exporter health must include protocol, endpoint, queue stats, last success/error timestamps, and cumulative error counters for each signal.
 1. **Extensibility**: Public interfaces for instrumentation hooks, attribute mutators, and exporters; documentation covering how to implement each.
 
@@ -91,7 +91,7 @@ Core scenarios:
 1. **Core Runtime**: Manages OTEL SDK instances, resource detectors, sampling, and exporter lifecycle.
 1. **Instrumentation Packs**: Optional modules per surface (HTTP, gRPC, DB, MQ, cron) that register middleware and metrics.
 1. **Exporter Adapters**: Interfaces plus default OTLP implementations; additional adapters live under `pkg/exporters`.
-1. **Configuration Layer**: Sources (env, file, remote) merge into a canonical struct; supports live reload via fsnotify.
+1. **Configuration Layer**: Sources (env, file, remote) merge into a canonical struct; supports live reload via fsnotify with debounced events and config fingerprinting to avoid redundant runtime rebuilds.
 1. **Extension Points**: Hook interfaces for attribute mutation, span processors, metric pipelines, and log sinks.
 1. **Diagnostics Module**: Exposes runtime health, dependency stats, and last-error info.
 

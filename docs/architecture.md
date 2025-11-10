@@ -124,12 +124,13 @@ Instrumentation packs share a base module that fetches tracer/meter handles lazi
 ## 9. Logging Integration
 
 - `pkg/logging` exposes `observe.Logger()` returning an adapter that enriches entries with `trace_id`, `span_id`, `tenant_id`.
-- Supports bridging existing loggers via wrappers: `logging.WrapZap(zap.Logger)`, `logging.WrapSlog(slog.Logger)`.
-- Log sampling settings mirrored from tracing config to keep correlated signals consistent.
+- Built-in adapters target `slog`, `zap`, `zerolog`, and stdlib loggers and expose a consistent `Debug/Info/Error` surface.
+- Config-driven sampling + level filters keep noisy services lightweight while still surfacing errors.
 
 ## 10. Diagnostics & Self Telemetry
 
 - `/observe/status` returns exporter health (protocol, endpoint, last success/error timestamps, cumulative error counts) for both trace and metric exporters, sampler mode, queue limit, dropped spans, instrumentation toggles, and config reload count. Optional auth via token/header (`diagnostics.auth_token`).
+- Config hot reload is debounced and deduplicated using config fingerprints to avoid thrashing exporters on repeated writes.
 - `runtime_metrics` instrument records queue size, dropped spans, config reload counts, instrumentation enablement status.
 - Panic/failure hooks emit structured events and escalate via logging adapters.
 

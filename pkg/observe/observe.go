@@ -3,8 +3,12 @@ package observe
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"path/filepath"
 	"sync"
+	"time"
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/hyp3rd/ewrap"
@@ -24,6 +28,7 @@ type Client struct {
 	logger       logging.Adapter
 	metricsState *runtime.MetricsState
 	watchCancel  context.CancelFunc
+	configDigest string
 }
 
 // Init bootstraps the instrumentation runtime from configuration sources.
@@ -62,11 +67,17 @@ func Init(ctx context.Context, opts ...Option) (*Client, error) {
 		return nil, ewrap.Wrap(err, "init runtime metrics")
 	}
 
+	digest, err := configDigest(cfg)
+	if err != nil {
+		return nil, ewrap.Wrap(err, "hash config")
+	}
+
 	client := &Client{
 		runtime:      rt,
 		opts:         settings,
 		logger:       logger,
 		metricsState: metricsState,
+		configDigest: digest,
 	}
 
 	err = client.startConfigWatcher(ctx)
@@ -141,7 +152,7 @@ func (c *Client) startConfigWatcher(ctx context.Context) error {
 
 // watchLoop monitors configuration changes and triggers runtime reloads.
 //
-//nolint:revive // cognitive-complexity: Breaking this up would reduce clarity.
+//nolint:revive,cyclop // cognitive-complexity: Breaking this up would reduce clarity.
 func (c *Client) watchLoop(ctx context.Context, watcher *fsnotify.Watcher, target string) {
 	defer func() {
 		closeErr := watcher.Close()
@@ -149,6 +160,17 @@ func (c *Client) watchLoop(ctx context.Context, watcher *fsnotify.Watcher, targe
 			c.logger.Error(ctx, closeErr, "close config watcher after add failure")
 		}
 	}()
+
+	timer := time.NewTimer(time.Hour)
+	if !timer.Stop() {
+		select {
+		case <-timer.C:
+		default:
+		}
+	}
+	defer timer.Stop()
+
+	pending := false
 
 	for {
 		select {
@@ -167,6 +189,23 @@ func (c *Client) watchLoop(ctx context.Context, watcher *fsnotify.Watcher, targe
 				continue
 			}
 
+			if c.opts.reloadDebounce <= 0 {
+				c.logger.Info(ctx, "configuration change detected", attribute.String("path", target))
+				c.reloadRuntime(ctx)
+
+				continue
+			}
+
+			pending = true
+
+			resetTimer(timer, c.opts.reloadDebounce)
+		case <-timer.C:
+			if !pending {
+				continue
+			}
+
+			pending = false
+
 			c.logger.Info(ctx, "configuration change detected", attribute.String("path", target))
 			c.reloadRuntime(ctx)
 		case err, ok := <-watcher.Errors:
@@ -183,6 +222,19 @@ func (c *Client) reloadRuntime(ctx context.Context) {
 	cfg, err := c.opts.loadConfig(ctx)
 	if err != nil {
 		c.logger.Error(ctx, err, "reload config failed")
+
+		return
+	}
+
+	digest, err := configDigest(cfg)
+	if err != nil {
+		c.logger.Error(ctx, err, "hash config failed")
+
+		return
+	}
+
+	if digest == c.configDigest {
+		c.logger.Debug(ctx, "configuration unchanged, skipping reload")
 
 		return
 	}
@@ -210,6 +262,7 @@ func (c *Client) reloadRuntime(ctx context.Context) {
 
 	c.swapRuntime(ctx, rt)
 	c.metricsState.IncrementConfigReloads()
+	c.configDigest = digest
 	c.logger.Info(ctx, "runtime reloaded")
 }
 
@@ -228,4 +281,26 @@ func (c *Client) swapRuntime(ctx context.Context, newRuntime *runtime.Runtime) {
 			c.logger.Error(shutdownCtx, err, "shutdown previous runtime")
 		}
 	}
+}
+
+func resetTimer(timer *time.Timer, duration time.Duration) {
+	if !timer.Stop() {
+		select {
+		case <-timer.C:
+		default:
+		}
+	}
+
+	timer.Reset(duration)
+}
+
+func configDigest(cfg config.Config) (string, error) {
+	data, err := json.Marshal(cfg)
+	if err != nil {
+		return "", ewrap.Wrap(err, "marshal config for digest")
+	}
+
+	sum := sha256.Sum256(data)
+
+	return hex.EncodeToString(sum[:]), nil
 }

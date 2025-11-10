@@ -17,6 +17,7 @@ import (
 
 // Adapter describes the logging contract used within the observe library.
 type Adapter interface {
+	Debug(ctx context.Context, msg string, attrs ...attribute.KeyValue)
 	Info(ctx context.Context, msg string, attrs ...attribute.KeyValue)
 	Error(ctx context.Context, err error, msg string, attrs ...attribute.KeyValue)
 }
@@ -35,6 +36,9 @@ func (NoopAdapter) Info(context.Context, string, ...attribute.KeyValue) {}
 // Error implements Adapter.
 func (NoopAdapter) Error(context.Context, error, string, ...attribute.KeyValue) {}
 
+// Debug implements Adapter.
+func (NoopAdapter) Debug(context.Context, string, ...attribute.KeyValue) {}
+
 // SlogAdapter writes logs using log/slog.
 type SlogAdapter struct {
 	logger *slog.Logger
@@ -52,6 +56,11 @@ func NewSlogAdapter(logger *slog.Logger) Adapter {
 // Info implements Adapter.
 func (s *SlogAdapter) Info(ctx context.Context, msg string, attrs ...attribute.KeyValue) {
 	s.logger.LogAttrs(ctx, slog.LevelInfo, msg, toSlogAttrs(withTrace(ctx, attrs))...)
+}
+
+// Debug implements Adapter.
+func (s *SlogAdapter) Debug(ctx context.Context, msg string, attrs ...attribute.KeyValue) {
+	s.logger.LogAttrs(ctx, slog.LevelDebug, msg, toSlogAttrs(withTrace(ctx, attrs))...)
 }
 
 // Error implements Adapter.
@@ -78,6 +87,11 @@ func (z *ZapAdapter) Info(ctx context.Context, msg string, attrs ...attribute.Ke
 	z.logger.Info(msg, toZapFields(withTrace(ctx, attrs))...)
 }
 
+// Debug implements Adapter.
+func (z *ZapAdapter) Debug(ctx context.Context, msg string, attrs ...attribute.KeyValue) {
+	z.logger.Debug(msg, toZapFields(withTrace(ctx, attrs))...)
+}
+
 // Error implements Adapter.
 func (z *ZapAdapter) Error(ctx context.Context, err error, msg string, attrs ...attribute.KeyValue) {
 	fields := toZapFields(withTrace(ctx, attrs))
@@ -101,6 +115,16 @@ func NewZerologAdapter(logger zerolog.Logger) Adapter {
 // Info implements Adapter.
 func (z ZerologAdapter) Info(ctx context.Context, msg string, attrs ...attribute.KeyValue) {
 	event := z.logger.Info()
+	for _, attr := range withTrace(ctx, attrs) {
+		event = event.Interface(string(attr.Key), attrValue(attr))
+	}
+
+	event.Msg(msg)
+}
+
+// Debug implements Adapter.
+func (z ZerologAdapter) Debug(ctx context.Context, msg string, attrs ...attribute.KeyValue) {
+	event := z.logger.Debug()
 	for _, attr := range withTrace(ctx, attrs) {
 		event = event.Interface(string(attr.Key), attrValue(attr))
 	}
@@ -139,6 +163,11 @@ func NewStdAdapter(logger *log.Logger) Adapter {
 // Info implements Adapter.
 func (s *StdAdapter) Info(ctx context.Context, msg string, attrs ...attribute.KeyValue) {
 	s.logger.Println(formatLine("INFO", msg, withTrace(ctx, attrs)))
+}
+
+// Debug implements Adapter.
+func (s *StdAdapter) Debug(ctx context.Context, msg string, attrs ...attribute.KeyValue) {
+	s.logger.Println(formatLine("DEBUG", msg, withTrace(ctx, attrs)))
 }
 
 // Error implements Adapter.

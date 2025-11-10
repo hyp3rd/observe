@@ -99,6 +99,8 @@ linters:
         - "module"
         - "http"
         - "grpc"
+        - "foo"
+        - "bar"
       # Detects constants with identical values.
       # Default: false
       find-duplicates: true
@@ -195,6 +197,8 @@ linters:
       # List of packages that don't end with _test that tests are allowed to be in.
       # Default: "main"
       allow-packages:
+        - observe
+        - logging
         - runtime
         - ticker
         - kafka
