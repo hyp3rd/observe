@@ -1,0 +1,46 @@
+---
+services:
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:latest
+    command: ["--config=/etc/otel-collector-config.yaml"]
+    volumes:
+      - ./examples/otel-collector-config.yaml:/etc/otel-collector-config.yaml
+    ports:
+      # OTLP gRPC
+      - "4317:4317"
+      # OTLP HTTP
+      - "4318:4318"
+      # Collector metrics
+      - "8888:8888"
+    depends_on:
+      jaeger:
+        condition: service_started
+
+  prometheus:
+    image: prom/prometheus:latest
+    volumes:
+      - ./examples/prometheus.yaml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+    depends_on:
+      otel-collector:
+        condition: service_started
+
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+      - COLLECTOR_OTLP_HTTP_ENABLED=true
+    ports:
+      # UI
+      - "16686:16686"
+      # Collector gRPC
+      - "14250:14250"
+
+  k6:
+    image: grafana/k6:latest
+    entrypoint: ["/bin/sh", "-c"]
+    command: ["sleep 3600"]
+    depends_on:
+      otel-collector:
+        condition: service_started

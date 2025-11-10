@@ -125,6 +125,22 @@ Add project-specific words to `cspell.json` in the `words` array.
 - [Instrumentation Packs](docs/instrumentation.md) – module-specific notes.
 - [Developer Guide](docs/developers.md) – logging adapters, config reload internals, testing/lint expectations.
 
+## Examples
+
+- `examples/basic` – minimal Init/Shutdown with a single span.
+- `examples/logging` – custom logging adapter wiring with span-aware log entries.
+- `examples/worker` – worker helper + ticker adapter driving periodic jobs.
+
+Spin up the supporting collector/Jaeger/Prometheus stack with:
+
+```bash
+make examples-up
+# run whichever example you want (go run ./examples/logging, etc.)
+make examples-down
+```
+
+All examples load `examples/observe.yaml`. Override any setting via env vars (e.g., `OBSERVE_EXPORTERS_OTLP_ENDPOINT`) or edit that file to point at alternate collectors.
+
 ## Available Make Targets
 
 ```bash

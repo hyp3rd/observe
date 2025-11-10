@@ -114,6 +114,14 @@ vet:
 	$(call check_command_exists,shadow) || go install golang.org/x/tools/go/analysis/passes/shadow/cmd/shadow@latest
 	go vet -vettool=$(which shadow)
 
+examples-up:
+	$(call check_command_exists,docker) || (echo "docker missing" && exit 1)
+	docker compose -f docker-compose.examples.yaml up -d
+
+examples-down:
+	$(call check_command_exists,docker) || (echo "docker missing" && exit 1)
+	docker compose -f docker-compose.examples.yaml down
+
 # check_command_exists is a helper function that checks if a command exists.
 define check_command_exists
 @which $(1) > /dev/null 2>&1 || (echo "$(1) command not found" && exit 1)
@@ -129,6 +137,8 @@ help:
 	@echo
 	@echo "Development commands:"
 	@echo "  prepare-toolchain\t\tInstall and configure all required development tools"
+	@echo "  examples-up\t\t\tStart OTEL/Prometheus/Jaeger stack for running examples"
+	@echo "  examples-down\t\t\tStop the example infrastructure"
 	@echo
 	@echo "Testing commands:"
 	@echo "  test\t\t\t\tRun all tests in the project"
@@ -139,4 +149,4 @@ help:
 	@echo
 	@echo
 	@echo "For more information, see the project README."
-.PHONY: prepare-toolchain test bench vet update-deps lint help
+.PHONY: prepare-toolchain test bench vet update-deps lint help examples-up examples-down

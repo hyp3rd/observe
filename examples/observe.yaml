@@ -1,0 +1,48 @@
+---
+service:
+  name: observe-example
+  namespace: examples
+  version: 0.0.1
+  environment: development
+exporters:
+  otlp:
+    protocol: grpc
+    endpoint: localhost:4317
+    insecure: true
+    timeout: 10s
+    compression: gzip
+    batch:
+      enabled: true
+      max_export_batch: 256
+      timeout: 5s
+      max_queue_size: 1024
+    retry:
+      enabled: true
+      max_elapsed_time: 2m
+      initial_interval: 500ms
+      max_interval: 5s
+    tls:
+      insecure: true
+sampling:
+  mode: parentbased_always_on
+instrumentation:
+  http:
+    enabled: true
+  grpc:
+    enabled: true
+  sql:
+    enabled: false
+  messaging:
+    enabled: false
+  worker:
+    enabled: true
+  runtime_metrics:
+    enabled: true
+logging:
+  level: debug
+  format: json
+  adapter: slog
+  sample_ratio: 1.0
+diagnostics:
+  enabled: true
+  http_addr: 127.0.0.1:0

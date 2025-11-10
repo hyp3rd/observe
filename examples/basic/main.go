@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/hyp3rd/observe/internal/constants"
+	"github.com/hyp3rd/observe/pkg/config"
 	"github.com/hyp3rd/observe/pkg/observe"
 )
 
@@ -15,7 +16,12 @@ const timerDuration = 10 * time.Millisecond
 func main() {
 	ctx := context.Background()
 
-	client, err := observe.Init(ctx)
+	client, err := observe.Init(ctx,
+		observe.WithLoaders(
+			config.FileLoader{Path: "examples/observe.yaml"},
+			config.EnvLoader{},
+		),
+	)
 	if err != nil {
 		log.Fatalf("init observe: %v", err)
 	}
