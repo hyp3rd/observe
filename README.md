@@ -118,6 +118,13 @@ Edit `.golangci.yaml` to customize linting rules for your project.
 
 Add project-specific words to `cspell.json` in the `words` array.
 
+## Documentation
+
+- [Product Requirements](docs/prd.md) – the scope and milestones for Observe.
+- [Architecture](docs/architecture.md) – runtime layout, exporters, diagnostics.
+- [Instrumentation Packs](docs/instrumentation.md) – module-specific notes.
+- [Developer Guide](docs/developers.md) – logging adapters, config reload internals, testing/lint expectations.
+
 ## Available Make Targets
 
 ```bash
